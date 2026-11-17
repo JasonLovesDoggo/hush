@@ -7,7 +7,7 @@ import IOKit.pwr_mgt
 /// instant the lid moves, and the sleep notification lets us finish before the
 /// Mac actually sleeps (we hold sleep until `onWillSleep` returns).
 final class LidMonitor {
-    enum Event { case closed(causesSleep: Bool), opened, willSleep, didWake }
+    enum Event { case closed, opened, willSleep, didWake }
 
     private let onEvent: (Event) -> Void
     private let rootDomain: io_service_t
@@ -54,9 +54,7 @@ final class LidMonitor {
 
     private func handleInterest(_ type: UInt32, _ state: UInt) {
         guard type == Self.clamshellStateChange else { return }
-        let closed = state & 1 != 0         // kClamshellStateBit
-        let causesSleep = state & 2 != 0    // kClamshellSleepBit — false in clamshell mode with a display
-        onEvent(closed ? .closed(causesSleep: causesSleep) : .opened)
+        onEvent(state & 1 != 0 ? .closed : .opened) // kClamshellStateBit
     }
 
     private func handlePower(_ type: UInt32, _ arg: UnsafeMutableRawPointer?) {

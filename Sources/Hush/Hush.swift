@@ -42,11 +42,11 @@ final class Hush {
 
     private func handle(_ event: LidMonitor.Event) {
         switch event {
-        case .closed(let causesSleep):
-            if causesSleep || !stayOnWithDisplay { turnOff() }
+        case .closed:
+            if !inClamshellMode { turnOff() }
         case .willSleep:
             // Backstop in case the clamshell message was missed.
-            if lid?.isLidClosed == true, !stayOnWithDisplay || !externalDisplayAttached { turnOff() }
+            if lid?.isLidClosed == true, !inClamshellMode { turnOff() }
         case .opened:
             restore()
         case .didWake:
@@ -54,8 +54,16 @@ final class Hush {
         }
     }
 
-    private var externalDisplayAttached: Bool {
-        NSScreen.screens.contains { CGDisplayIsBuiltin($0.displayID) == 0 }
+    /// Lid closed but still driving an external display — likely still typing on Bluetooth.
+    /// Checked directly: the kernel's AppleClamshellCausesSleep flag reads "No" even on
+    /// battery with no display attached, so it can't be trusted for this.
+    private var inClamshellMode: Bool {
+        guard stayOnWithDisplay else { return false }
+        var count: UInt32 = 0
+        CGGetOnlineDisplayList(0, nil, &count)
+        var ids = [CGDirectDisplayID](repeating: 0, count: Int(count))
+        CGGetOnlineDisplayList(count, &ids, &count)
+        return ids.prefix(Int(count)).contains { CGDisplayIsBuiltin($0) == 0 }
     }
 
     private func turnOff() {
@@ -84,7 +92,7 @@ final class Hush {
 
     private func record(_ text: String) {
         lastAction = (text, .now)
-        log.info("\(text, privacy: .public)")
+        log.notice("\(text, privacy: .public)")
     }
 
     var launchAtLogin = SMAppService.mainApp.status == .enabled {
@@ -97,11 +105,5 @@ final class Hush {
                 launchAtLogin = SMAppService.mainApp.status == .enabled
             }
         }
-    }
-}
-
-private extension NSScreen {
-    var displayID: CGDirectDisplayID {
-        deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID ?? 0
     }
 }

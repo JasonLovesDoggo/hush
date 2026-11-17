@@ -58,7 +58,7 @@ final class Bluetooth: NSObject {
         try? await Task.sleep(for: .seconds(1))
         for address in addresses {
             guard let device = IOBluetoothDevice(addressString: address), !device.isConnected() else { continue }
-            log.info("Reconnecting \(device.name ?? address, privacy: .public)")
+            log.notice("Reconnecting \(device.name ?? address, privacy: .public)")
             device.openConnection(connector)
         }
     }
@@ -79,7 +79,7 @@ extension Bluetooth: @preconcurrency CBCentralManagerDelegate {
 private final class Connector: NSObject {
     @objc func connectionComplete(_ device: IOBluetoothDevice, status: IOReturn) {
         if status != kIOReturnSuccess {
-            log.info("Reconnect failed for \(device.name ?? "device", privacy: .public): \(status)")
+            log.notice("Reconnect failed for \(device.name ?? "device", privacy: .public): \(status)")
         }
     }
 }
