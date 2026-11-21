@@ -19,4 +19,4 @@ mv "$TMP/Hush.app" "$DEST/"
 xattr -dr com.apple.quarantine "$DEST/Hush.app" 2>/dev/null || true
 open "$DEST/Hush.app"
 
-echo "Installed to $DEST/Hush.app — look for the Bluetooth rune in your menu bar."
+echo "Installed to $DEST/Hush.app — look for the closing-lid icon in your menu bar."

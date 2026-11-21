@@ -2,20 +2,20 @@ import SwiftUI
 
 struct MenuView: View {
     @Bindable var hush: Hush
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            header
+            tiles
+            Text(hush.isEnabled ? "Closing the lid turns Bluetooth off." : "Paused. Closing the lid leaves Bluetooth alone.")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .padding(.top, 8)
+                .padding(.horizontal, 2)
+                .contentTransition(.opacity)
             if hush.bluetooth.access == .denied { accessBanner }
 
-            Divider().padding(.vertical, 8)
-
-            Row("Bluetooth", isOn: Binding(
-                get: { hush.bluetooth.isOn },
-                set: { hush.setBluetooth($0) }
-            ))
-
-            Divider().padding(.vertical, 8)
+            Divider().padding(.vertical, 10)
 
             Group {
                 SectionLabel("When the lid opens")
@@ -39,40 +39,33 @@ struct MenuView: View {
 
             footer
         }
-        .padding(14)
+        .padding(12)
         .frame(width: 300)
-        .animation(.smooth(duration: 0.25), value: hush.isEnabled)
-        .animation(.smooth(duration: 0.25), value: hush.restoreOnOpen)
+        .animation(.smooth(duration: 0.2), value: hush.isEnabled)
+        .animation(.smooth(duration: 0.2), value: hush.restoreOnOpen)
     }
 
-    private var header: some View {
-        HStack(spacing: 10) {
-            ZStack {
-                Circle().fill(hush.isEnabled
-                    ? AnyShapeStyle(LinearGradient(colors: [Color(red: 0.23, green: 0.25, blue: 0.61),
-                                                            Color(red: 0.07, green: 0.08, blue: 0.22)],
-                                                   startPoint: .top, endPoint: .bottom))
-                    : AnyShapeStyle(Color.secondary.opacity(0.2)))
-                Rune()
-                    .stroke(style: StrokeStyle(lineWidth: 1.8, lineCap: .round, lineJoin: .round))
-                    .foregroundStyle(hush.isEnabled ? .white : .secondary)
-                    .frame(width: 9, height: 13)
+    /// Two Control Center–style modules: Hush itself, and the radio it manages.
+    private var tiles: some View {
+        GlassGroup {
+            HStack(spacing: 8) {
+                Tile(title: "Hush", subtitle: hush.isEnabled ? "On" : "Paused", isOn: hush.isEnabled) {
+                    hush.isEnabled.toggle()
+                } icon: {
+                    Lid(angle: hush.isEnabled ? Lid.closing : Lid.open)
+                        .stroke(style: StrokeStyle(lineWidth: 1.8, lineCap: .round))
+                        .frame(width: 13, height: 9)
+                        .offset(x: -1, y: 1)
+                        .animation(reduceMotion ? nil : .spring(duration: 0.4, bounce: 0.15), value: hush.isEnabled)
+                }
+                Tile(title: "Bluetooth", subtitle: hush.bluetooth.isOn ? "On" : "Off", isOn: hush.bluetooth.isOn) {
+                    hush.setBluetooth(!hush.bluetooth.isOn)
+                } icon: {
+                    Rune()
+                        .stroke(style: StrokeStyle(lineWidth: 1.7, lineCap: .round, lineJoin: .round))
+                        .frame(width: 8, height: 12)
+                }
             }
-            .frame(width: 28, height: 28)
-
-            VStack(alignment: .leading, spacing: 1) {
-                Text("Hush").font(.system(size: 13, weight: .semibold))
-                Text(hush.isEnabled ? "Bluetooth off when the lid closes" : "Paused")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .contentTransition(.opacity)
-            }
-            Spacer(minLength: 8)
-            Toggle("Enabled", isOn: $hush.isEnabled)
-                .labelsHidden()
-                .toggleStyle(.switch)
-                .controlSize(.small)
         }
     }
 
@@ -92,7 +85,7 @@ struct MenuView: View {
         .padding(8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.yellow.opacity(0.12), in: .rect(cornerRadius: 8))
-        .padding(.top, 10)
+        .padding(.top, 8)
     }
 
     private var footer: some View {
@@ -138,5 +131,74 @@ private struct SectionLabel: View {
             .font(.system(size: 11, weight: .semibold))
             .foregroundStyle(.secondary)
             .padding(.bottom, 2)
+    }
+}
+
+/// A Control Center module: a round toggle button on a glass tile. The whole tile is the hit target.
+private struct Tile<Icon: View>: View {
+    let title: String
+    let subtitle: String
+    let isOn: Bool
+    let action: () -> Void
+    @ViewBuilder let icon: Icon
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                icon
+                    .foregroundStyle(isOn ? .white : .primary)
+                    .frame(width: 30, height: 30)
+                    .background { Circle().fill(isOn ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.quaternary)) }
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(title).font(.system(size: 12, weight: .semibold))
+                    Text(subtitle)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .contentTransition(.numericText())
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(8)
+            .frame(maxWidth: .infinity)
+            .contentShape(.rect(cornerRadius: 16))
+            .glassTile()
+        }
+        .buttonStyle(PressStyle())
+        .animation(.smooth(duration: 0.2), value: isOn)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
+        .accessibilityValue(subtitle)
+        .accessibilityAddTraits(isOn ? [.isButton, .isSelected] : .isButton)
+    }
+}
+
+/// Instant, subtle press feedback — the menu is opened many times a day, so nothing slower.
+private struct PressStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .animation(.spring(duration: 0.16, bounce: 0), value: configuration.isPressed)
+    }
+}
+
+/// Liquid Glass on macOS 26+, a quiet material fill before that.
+private struct GlassGroup<Content: View>: View {
+    @ViewBuilder let content: Content
+    var body: some View {
+        if #available(macOS 26, *) {
+            GlassEffectContainer(spacing: 8) { content }
+        } else {
+            content
+        }
+    }
+}
+
+private extension View {
+    @ViewBuilder func glassTile() -> some View {
+        if #available(macOS 26, *) {
+            glassEffect(.regular.interactive(), in: .rect(cornerRadius: 16))
+        } else {
+            background(.quinary, in: .rect(cornerRadius: 16))
+        }
     }
 }

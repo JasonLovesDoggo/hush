@@ -9,7 +9,7 @@ struct HushApp: App {
         MenuBarExtra {
             MenuView(hush: hush)
         } label: {
-            Image(nsImage: .menuBarRune(paused: !hush.isEnabled))
+            Image(nsImage: .menuBarLid(paused: !hush.isEnabled))
                 .accessibilityLabel(hush.isEnabled ? "Hush, on" : "Hush, paused")
         }
         .menuBarExtraStyle(.window)
